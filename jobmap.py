@@ -11,7 +11,7 @@ boss_url = 'http://www.zhipin.com/c101010100/e_104-d_203-h_101010100/?query=pyth
 # 1.访问网页
 # 伪造浏览器headres
 myheaders = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.80 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
     }
 # myproxies = {'http':'http://42.237.128.144:80'
 # }
@@ -22,12 +22,7 @@ def parse_html(db,times,html,cursor):
 	times += 1
 	soup = BeautifulSoup(html,'html.parser')
 	job_div_soup = soup.find('div',attrs = {'class':'job-list'})
-	# 防止被封白爬
-	if job_div_soup == None:
-		db.commit()
-		db.close()
-		return times,None
-	else:
+	if job_div_soup != None:
 		job_ul_soup = job_div_soup.find('ul')
 		job_li_list = job_ul_soup.find_all('li')
 		for job_li_soup in job_li_list:
@@ -38,21 +33,31 @@ def parse_html(db,times,html,cursor):
 			detail_url = 'http://www.zhipin.com'+job_li_soup.find('div',attrs = {'class':'info-primary'}).find('a')['href']
 			detail_html = down_loadpages(detail_url)
 			detail_soup = BeautifulSoup(detail_html,'html.parser')
-			website_p = detail_soup.find('div',attrs = {'class':'info-company'}).find_all('p')
-			if len(website_p) <2:
-				website = ''
+			test_lock2 = detail_soup.find('div',attrs = {'class':'info-company'})
+			# 验证码页面
+			if test_lock2 != None:
+				website_p = detail_soup.find('div',attrs = {'class':'info-company'}).find_all('p')
+				if len(website_p) <2:
+					website = ''
+				else:
+					website = website_p[1].getText()
+				address = detail_soup.find('div',attrs = {'class':'location-address'}).getText()
+				# print(company_name)
+				sql = 'insert into job_bj_py (description,salary,company,website,address) values("'+job_name+'","'+job_salary+'","'+company_name+'","'+website+'","'+address+'")'
+				print(sql)
+				cursor.execute(sql)
+				db.commit()
+				time.sleep(1)
 			else:
-				website = website_p[1].getText()
-			address = detail_soup.find('div',attrs = {'class':'location-address'}).getText()
-			# print(company_name)
-			sql = 'insert into job_bj_py (description,salary,company,website,address) values("'+job_name+'","'+job_salary+'","'+company_name+'","'+website+'","'+address+'")'
-			print(sql)
-			cursor.execute(sql)
-			time.sleep(1)
+				print('我被封了')
+				return times,None
 		next_page = 'http://www.zhipin.com'+soup.find('div',attrs = {'class':'page'}).find('a',attrs = {'class':'next'})['href']
 		# print(next_page)
 		if times < 10:
 			return times,next_page
+		return times,None
+	else:
+		print('我被封了')
 		return times,None
 # 创建表
 def create_table():
@@ -83,9 +88,10 @@ def main():
 	while url:
 		html = down_loadpages(url)
 		i,url = parse_html(db,i,html,cursor)
-	db.commit()
 	db.close()
-
+def_proxies(html):
+	soup = BeautifulSoup(html,'html.parser')
+	
 
 if __name__ == '__main__':
 	main()
